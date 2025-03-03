@@ -3,6 +3,8 @@
 #include <espnow.h>
 #include <IRremoteESP8266.h>
 #include <IRsend.h>
+#include <IRrecv.h>
+#include <FastLED.h>
 
 #define UUU 111
 #define UUR 112
@@ -71,47 +73,106 @@
 
 #define cmdTreeSize 21
 
+#define LED_IN 4 // D2
+
+#define NUM_LEDS 8
+
+#define FIRST_LED_1 2
+#define FIRST_LED_2 4
+#define FIRST_LED_3 6
+
 // Structure example to receive data
 // Must match the sender structure
 typedef struct struct_message {
-    uint8_t move;
+    int move;
 } struct_message;
 
-const uint16_t irPin = 4;
+const uint16_t emiPin = 5; // D1
+const uint16_t rcvPin = 0; // D3
 
-IRsend irsend(irPin);
+IRsend irSend(emiPin);
+IRrecv irRecv(rcvPin);
 
+decode_results results;
+
+// const uint16_t kCaptureBufferSize = 1024;
+// const uint8_t kTimeout = 50;
+// const uint16_t kFrequency = 38000;
+// IRrecv irrecv(kRecvPin, kCaptureBufferSize, kTimeout, false);
 
 // Create a struct_message called myData
 struct_message myData;
 
+CRGB leds[NUM_LEDS];
+
+
 //Default Command tree
-unsigned short int commandTree[cmdTreeSize][3] = {{UUU, 0x0, 0x21},
-                                                  {UUR, 0x0, 0x22},
-                                                  {UUD, 0x0, 0x23},
-                                                  {UUL, 0x0, 0x24},
-                                                  {URU, 0x0, 0x25},
-                                                  {URR, 0x0, 0x26},
-                                                  {URD, 0x0, 0x27},
-                                                  {URL, 0x0, 0x28},
-                                                  {UDU, 0x0, 0x29},
-                                                  {UDR, 0x0, 0x30},
-                                                  {UDD, 0x0, 0x31},
-                                                  {UDL, 0x0, 0x32},
-                                                  {ULU, 0x0, 0x33},
-                                                  {ULR, 0x0, 0x34},
-                                                  {ULD, 0x0, 0x35},
-                                                  {ULL, 0x0, 0x36},
-                                                  {RUU, 0x0, 0x37},
-                                                  {RUR, 0x0, 0x38},
-                                                  {RUD, 0x0, 0x39},
-                                                  {RUL, 0x0, 0x40},
-                                                  {DUU, 0x0, 0x41}};
+unsigned short int commandTree[cmdTreeSize][3] = {{UUU, 0xBF00, 0x1D},
+                                                  {UUR, 0xBF00, 0x42},
+                                                  {UUD, 0xBF00, 0x45},
+                                                  {UUL, 0xBF00, 0x40},
+                                                  // {URU, 0x0, 0x25},
+                                                  // {URR, 0x0, 0x26},
+                                                  // {URD, 0x0, 0x27},
+                                                  // {URL, 0x0, 0x28},
+                                                  {UDU, 0xBF00, 0x3},
+                                                  {UDR, 0xBF00, 0x41},
+                                                  // {UDD, 0x0, 0x31},
+                                                  {UDL, 0xBF00, 0x1C},
+                                                  // {ULU, 0x0, 0x33},
+                                                  // {ULR, 0x0, 0x34},
+                                                  // {ULD, 0x0, 0x35},
+                                                  // {ULL, 0x0, 0x36},
+                                                  // {RUU, 0x0, 0x37},
+                                                  // {RUR, 0x0, 0x38},
+                                                  // {RUD, 0x0, 0x39},
+                                                  // {RUL, 0x0, 0x40},
+                                                  // {DUU, 0x0, 0x41}
+                                                  };
+
+void wait(unsigned long milliseconds)
+{
+  unsigned long currentTime = millis();
+  unsigned long previousTime = millis();
+
+  while (currentTime - previousTime <= milliseconds)
+  {
+    currentTime = millis();
+  }
+}
+
+void ledControl(uint8 singleMove, uint8 firstLed){
+  switch (singleMove){
+    case 1:
+      leds[firstLed] = CRGB(255, 0, 0);
+      leds[firstLed+1] = CRGB(255, 0, 0);
+      FastLED.show();
+      break;
+    case 2:
+      leds[firstLed] = CRGB(0, 255, 0);
+      leds[firstLed+1] = CRGB(0, 255, 0);
+      FastLED.show();
+      break;
+    case 3:
+      leds[firstLed] = CRGB(0, 0, 255);
+      leds[firstLed+1] = CRGB(0, 0, 255);
+      FastLED.show();
+      break;
+    case 4:
+      leds[firstLed] = CRGB(255, 255, 0);
+      leds[firstLed+1] = CRGB(255, 255, 0);
+      FastLED.show();
+      break;
+    default:
+      FastLED.clear();
+      break;
+  }
+}
 
 void sendIRbyMoveSequence(unsigned short int movement){
   for (int row = 0; row < cmdTreeSize; row++) {
     if(movement == commandTree[row][0]){
-      irsend.sendNEC(irsend.encodeNEC(commandTree[row][1], commandTree[row][2]));
+      irSend.sendNEC(irSend.encodeNEC(commandTree[row][1], commandTree[row][2]));
       Serial.println(commandTree[row][2]);
       Serial.println("Comando enviado!");
       Serial.println();
@@ -121,20 +182,32 @@ void sendIRbyMoveSequence(unsigned short int movement){
 }
 // Callback function that will be executed when data is received
 void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
+  // digitalWrite(LED_IN, LOW);
   memcpy(&myData, incomingData, sizeof(myData));
+
+  Serial.println(myData.move);
+
+  ledControl(myData.move/100, FIRST_LED_1);
+  ledControl((myData.move%100)/10, FIRST_LED_2);
+  ledControl((myData.move%100)%10, FIRST_LED_3);
+
   if(myData.move <= 144){
-    Serial.println(myData.move);
     sendIRbyMoveSequence(myData.move);
+  
   } else {
-    Serial.println(myData.move);
     Serial.println("Comando Não pertence a este!");
     Serial.println();
   }
+  wait(100);
+  FastLED.clear();
 }
 
  
 void setup() {
-  irsend.begin();
+  irSend.begin();
+
+  // pinMode(LED_IN, OUTPUT);
+  FastLED.addLeds<NEOPIXEL, LED_IN>(leds, NUM_LEDS);
 
   // Initialize Serial Monitor
   Serial.begin(115200);
@@ -142,18 +215,30 @@ void setup() {
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
 
+  irRecv.enableIRIn();
+
   // Init ESP-NOW
   if (esp_now_init() != 0) {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
   
-  // Once ESPNow is successfully Init, we will register for recv CB to
-  // get recv packer info
   esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
   esp_now_register_recv_cb(OnDataRecv);
+  // digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop() {
-  
+  if(irRecv.decode(&results)){
+    Serial.println("Decoding IR Received");
+    Serial.println(results.decode_type);
+    Serial.println("Address: ");
+    Serial.print("0x");
+    Serial.println(results.address, HEX);
+    Serial.println("Command: ");
+    Serial.print("0x");
+    Serial.println(results.command, HEX);
+    Serial.println();
+    irRecv.resume(); // Receive the next value
+  };
 }
