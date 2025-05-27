@@ -77,9 +77,9 @@
 
 #define NUM_LEDS 8
 
-#define FIRST_LED_1 2
-#define FIRST_LED_2 4
-#define FIRST_LED_3 6
+#define ID_LED_1 0
+#define ID_LED_2 1
+#define ID_LED_3 2
 
 // Structure example to receive data
 // Must match the sender structure
@@ -106,20 +106,20 @@ struct_message myData;
 CRGB leds[NUM_LEDS];
 
 
-//Default Command tree
-unsigned short int commandTree[cmdTreeSize][3] = {{UUU, 0xBF00, 0x3},
-                                                  {UUR, 0xBF00, 0x1C},
-                                                  {UUD, 0xBF00, 0x41},
-                                                  // {UUL, 0xBF00, 0x40},
-                                                  // {URU, 0x0, 0x25},
-                                                  // {URR, 0x0, 0x26},
-                                                  // {URD, 0x0, 0x27},
-                                                  // {URL, 0x0, 0x28},
-                                                  {UDU, 0xBF00, 0x1D},
-                                                  {UDR, 0xBF00, 0x42},
-                                                  {UDD, 0xBF00, 0x45},
-                                                  {UDL, 0xBF00, 0x40},
-                                                  // {ULU, 0x0, 0x33},
+//Default Command tree PROJETOR
+unsigned short int commandTree[cmdTreeSize][3] = {{UUU, 0x0, 0x14}, // ON/OFF
+                                                  {UUR, 0x0, 0x13}, // MENU
+                                                  {UUD, 0x0, 0x7}, // OK
+                                                  {UUL, 0x0, 0x5C}, // BACK
+                                                  {URU, 0x0, 0x82}, // MOUSE
+                                                  {URR, 0x0, 0xB}, // PLUS SOUND
+                                                  {URD, 0x0, 0x1}, // MUTE
+                                                  {URL, 0x0, 0x58}, // MINUS SOUND
+                                                  {UDU, 0x0, 0x3}, // ARROW UP
+                                                  {UDR, 0x0, 0x1A}, // ARROW RIGHT
+                                                  {UDD, 0x0, 0x2}, // ARROW DOWN
+                                                  {UDL, 0x0, 0xE}, // ARROW LEFT
+                                                  {ULU, 0x0, 0x48}, // HOME
                                                   // {ULR, 0x0, 0x34},
                                                   // {ULD, 0x0, 0x35},
                                                   // {ULL, 0x0, 0x36},
@@ -141,26 +141,22 @@ void wait(unsigned long milliseconds)
   }
 }
 
-void ledControl(uint8 singleMove, uint8 firstLed){
+void ledControl(uint8 singleMove, uint8 idLed){
   switch (singleMove){
     case 1:
-      leds[firstLed] = CRGB(255, 0, 0);
-      leds[firstLed+1] = CRGB(255, 0, 0);
+      leds[idLed] = CRGB(255, 0, 0);
       FastLED.show();
       break;
     case 2:
-      leds[firstLed] = CRGB(0, 255, 0);
-      leds[firstLed+1] = CRGB(0, 255, 0);
+      leds[idLed] = CRGB(0, 255, 0);
       FastLED.show();
       break;
     case 3:
-      leds[firstLed] = CRGB(0, 0, 255);
-      leds[firstLed+1] = CRGB(0, 0, 255);
+      leds[idLed] = CRGB(0, 0, 255);
       FastLED.show();
       break;
     case 4:
-      leds[firstLed] = CRGB(255, 255, 0);
-      leds[firstLed+1] = CRGB(255, 255, 0);
+      leds[idLed] = CRGB(255, 255, 0);
       FastLED.show();
       break;
     default:
@@ -187,9 +183,9 @@ void OnDataRecv(uint8_t * mac, uint8_t *incomingData, uint8_t len) {
 
   Serial.println(myData.move);
 
-  ledControl(myData.move/100, FIRST_LED_1);
-  ledControl((myData.move%100)/10, FIRST_LED_2);
-  ledControl((myData.move%100)%10, FIRST_LED_3);
+  ledControl(myData.move/100, ID_LED_1);
+  ledControl((myData.move%100)/10, ID_LED_2);
+  ledControl((myData.move%100)%10, ID_LED_3);
 
   if(myData.move <= 144){
     sendIRbyMoveSequence(myData.move);
